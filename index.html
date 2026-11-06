@@ -1,0 +1,425 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Membership Health Dashboard (Demo)</title>
+<meta name="description" content="A demo membership analytics dashboard for a fictional golf association: joins and lapses, cohort retention, churn risk, lifetime value, and NPS. Synthetic data. Built with Claude by Chris Coyoli.">
+<meta property="og:title" content="Membership Health Dashboard (Demo)">
+<meta property="og:description" content="Cohort retention, churn risk, lifetime value, and NPS for a fictional golf association. Synthetic data, built with Claude.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://chriscoyoli.github.io/membership-dashboard/preview.png">
+<meta property="og:url" content="https://chriscoyoli.github.io/membership-dashboard/">
+<meta name="twitter:card" content="summary_large_image">
+<style>
+:root{
+  color-scheme: light;
+  --page:#f9f9f7; --surface:#fcfcfb; --ink:#0b0b0b; --ink-2:#52514e; --muted:#6f6d68;
+  --grid:#e1e0d9; --axis:#c3c2b7; --ring:rgba(11,11,11,.10);
+  --brand:#155839; --brand-ink:#f6f1e6; --good:#006300; --bad:#b3261e;
+  --s1:#2a78d6; --s2:#eb6834;
+  --c1:#86b6ef; --c2:#2a78d6; --c3:#104281;
+  --q100:#cde2fb; --q700:#0d366b;
+  --hi:#2a78d6; --lo:#c3c2b7;
+  --tip:#0b0b0b; --tip-ink:#ffffff;
+}
+@media (prefers-color-scheme: dark){
+  :root:where(:not([data-theme="light"])){
+    color-scheme: dark;
+    --page:#0d0d0d; --surface:#1a1a19; --ink:#ffffff; --ink-2:#c3c2b7; --muted:#a3a198;
+    --grid:#2c2c2a; --axis:#383835; --ring:rgba(255,255,255,.10);
+    --brand:#1d6b46; --good:#0ca30c; --bad:#e66767;
+    --s1:#3987e5; --s2:#d95926;
+    --c1:#184f95; --c2:#3987e5; --c3:#9ec5f4;
+    --hi:#3987e5; --lo:#4a4a46;
+    --tip:#ffffff; --tip-ink:#0b0b0b;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --page:#0d0d0d; --surface:#1a1a19; --ink:#ffffff; --ink-2:#c3c2b7; --muted:#a3a198;
+  --grid:#2c2c2a; --axis:#383835; --ring:rgba(255,255,255,.10);
+  --brand:#1d6b46; --good:#0ca30c; --bad:#e66767;
+  --s1:#3987e5; --s2:#d95926;
+  --c1:#184f95; --c2:#3987e5; --c3:#9ec5f4;
+  --hi:#3987e5; --lo:#4a4a46;
+  --tip:#ffffff; --tip-ink:#0b0b0b;
+}
+*{box-sizing:border-box}
+html,body{margin:0;overflow-x:clip}
+body{background:var(--page);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-text-size-adjust:100%}
+.band{background:var(--brand);color:var(--brand-ink)}
+.band .in{max-width:1180px;margin:0 auto;padding:28px 24px 26px}
+.eyebrow{font-size:12px;letter-spacing:.08em;text-transform:uppercase;opacity:.8;margin:0 0 6px}
+h1{font-size:28px;line-height:1.2;margin:0 0 8px;font-weight:650;text-wrap:balance}
+.lede{margin:0;max-width:760px;opacity:.92}
+.demo{display:inline-block;margin-top:12px;font-size:12.5px;padding:3px 10px;border:1px solid rgba(246,241,230,.45);border-radius:999px}
+main{max-width:1180px;margin:0 auto;padding:18px 24px 40px}
+.filters{display:flex;flex-wrap:wrap;gap:18px;align-items:center;margin:4px 0 18px}
+.seg{display:inline-flex;border:1px solid var(--ring);border-radius:10px;overflow:hidden;background:var(--surface)}
+.seg button{font:inherit;font-size:13.5px;border:0;background:transparent;color:var(--ink-2);padding:7px 13px;cursor:pointer}
+.seg button+button{border-left:1px solid var(--ring)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--surface);font-weight:600}
+.seg button:hover:not([aria-pressed="true"]){background:var(--ring)}
+.flabel{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-right:8px}
+.theme{margin-left:auto}
+.kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:14px}
+.kpi{background:var(--surface);border:1px solid var(--ring);border-radius:12px;padding:14px 16px}
+.kpi .k{font-size:12.5px;color:var(--ink-2);margin:0 0 4px}
+.kpi .v{font-size:26px;font-weight:650;margin:0;line-height:1.15}
+.kpi .d{font-size:12.5px;margin:4px 0 0;color:var(--ink-2)}
+.kpi .d b{font-weight:600}
+.up{color:var(--good)} .down{color:var(--bad)}
+.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:14px}
+.card{background:var(--surface);border:1px solid var(--ring);border-radius:12px;padding:16px 18px 12px;min-width:0}
+.w7{grid-column:span 7}.w5{grid-column:span 5}.w6{grid-column:span 6}.w4{grid-column:span 4}.w8{grid-column:span 8}.w12{grid-column:span 12}
+.card h2{font-size:15.5px;margin:0;font-weight:620}
+.card .sub{font-size:13px;color:var(--ink-2);margin:2px 0 8px}
+.head{display:flex;gap:10px;align-items:flex-start;justify-content:space-between}
+.tbtn{font:inherit;font-size:12px;color:var(--ink-2);background:transparent;border:1px solid var(--ring);border-radius:8px;padding:3px 9px;cursor:pointer;white-space:nowrap}
+.tbtn:hover{color:var(--ink)}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12.5px;color:var(--ink-2);margin:0 0 4px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.sw{display:inline-block;width:12px;height:12px;border-radius:3px}
+.ln{display:inline-block;width:16px;height:2px;border-radius:2px}
+svg{display:block;width:100%;height:auto;overflow:visible}
+svg text{fill:var(--muted);font-size:11px;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+svg .lbl{fill:var(--ink-2);font-size:11.5px}
+svg .lblb{fill:var(--ink);font-size:11.5px;font-weight:600}
+.gridl{stroke:var(--grid);stroke-width:1}
+.base{stroke:var(--axis);stroke-width:1}
+.hit{fill:transparent;cursor:crosshair}
+.mark{transition:opacity .15s}
+.mark:hover,.mark:focus{opacity:.8;outline:none}
+table.tv{width:100%;border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums;margin:6px 0 4px}
+table.tv th,table.tv td{padding:4px 8px;border-bottom:1px solid var(--grid);text-align:right}
+table.tv th:first-child,table.tv td:first-child{text-align:left}
+table.tv th{color:var(--ink-2);font-weight:600}
+.tvwrap{max-height:260px;overflow:auto}
+.note{font-size:12.5px;color:var(--ink-2);margin:6px 0 0}
+#tip{position:fixed;pointer-events:none;background:var(--tip);color:var(--tip-ink);border-radius:8px;padding:8px 10px;font-size:12.5px;line-height:1.35;box-shadow:0 4px 18px rgba(0,0,0,.18);opacity:0;transition:opacity .08s;z-index:10;min-width:120px}
+#tip .t{opacity:.75;margin-bottom:4px}
+#tip .r{display:flex;align-items:center;gap:8px;justify-content:space-between}
+#tip .r b{font-variant-numeric:tabular-nums}
+#tip .r span{display:inline-flex;align-items:center;gap:6px;opacity:.85}
+footer{max-width:1180px;margin:0 auto;padding:0 24px 36px;font-size:12.5px;color:var(--muted)}
+footer a{color:var(--ink-2)}
+@media (max-width:980px){.kpis{grid-template-columns:repeat(3,1fr)}.w7,.w5,.w6,.w4,.w8{grid-column:span 12}}
+@media (max-width:560px){.band .in,main,footer{padding-left:16px;padding-right:16px}.kpis{grid-template-columns:repeat(2,1fr)}.kpi .v{font-size:22px}h1{font-size:23px}.theme{margin-left:0}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="band"><div class="in">
+  <p class="eyebrow">Membership analytics · Demo</p>
+  <h1>Membership Health Dashboard</h1>
+  <p class="lede" id="lede">Growth, retention, churn risk, lifetime value, and satisfaction for a fictional regional golf association.</p>
+  <span class="demo">Synthetic data. No real organization or member is represented.</span>
+</div></div>
+
+<main>
+  <div class="filters" role="group" aria-label="Filters">
+    <div><span class="flabel">Range</span><span class="seg" id="f-range">
+      <button data-v="12" aria-pressed="true">Last 12 mo</button><button data-v="24" aria-pressed="false">24 mo</button><button data-v="36" aria-pressed="false">36 mo</button>
+    </span></div>
+    <div><span class="flabel">Segment</span><span class="seg" id="f-seg">
+      <button data-v="All" aria-pressed="true">All</button><button data-v="Adult" aria-pressed="false">Adult</button><button data-v="Senior" aria-pressed="false">Senior</button><button data-v="Junior" aria-pressed="false">Junior</button>
+    </span></div>
+    <div class="theme"><span class="seg" id="f-theme" aria-label="Theme">
+      <button data-v="auto" aria-pressed="true">Auto</button><button data-v="light" aria-pressed="false">Light</button><button data-v="dark" aria-pressed="false">Dark</button>
+    </span></div>
+  </div>
+
+  <section class="kpis" id="kpis" aria-label="Key metrics"></section>
+
+  <div class="grid">
+    <section class="card w7" id="c-flow">
+      <div class="head"><div><h2>Joins vs. lapses by month</h2><p class="sub">Renewal season drives most lapses; spring drives most joins.</p></div><button class="tbtn">Table</button></div>
+      <div class="legend"><span><i class="sw" style="background:var(--s1)"></i>Joins</span><span><i class="sw" style="background:var(--s2)"></i>Lapses</span></div>
+      <div class="viz"></div>
+    </section>
+    <section class="card w5" id="c-coh">
+      <div class="head"><div><h2>Cohort retention</h2><p class="sub">Share of each join-year cohort still active, by months since joining.</p></div><button class="tbtn">Table</button></div>
+      <div class="legend"><span><i class="ln" style="background:var(--c1)"></i>2023 cohort</span><span><i class="ln" style="background:var(--c2)"></i>2024</span><span><i class="ln" style="background:var(--c3)"></i>2025</span></div>
+      <div class="viz"></div>
+    </section>
+    <section class="card w4" id="c-risk">
+      <div class="head"><div><h2>Churn risk by segment</h2><p class="sub">Members scored high-risk ahead of next renewal.</p></div><button class="tbtn">Table</button></div>
+      <div class="viz"></div>
+    </section>
+    <section class="card w4" id="c-drv">
+      <div class="head"><div><h2>What predicts a lapse</h2><p class="sub">Lapse rate vs. baseline for members showing each signal.</p></div><button class="tbtn">Table</button></div>
+      <div class="viz"></div>
+    </section>
+    <section class="card w4" id="c-ltv">
+      <div class="head"><div><h2>Lifetime value by segment</h2><p class="sub">Dues, events, and course revenue over expected tenure.</p></div><button class="tbtn">Table</button></div>
+      <div class="viz"></div>
+    </section>
+    <section class="card w12" id="c-nps">
+      <div class="head"><div><h2>Net Promoter Score by quarter</h2><p class="sub">Member survey, promoters minus detractors.</p></div><button class="tbtn">Table</button></div>
+      <div class="viz"></div>
+    </section>
+  </div>
+</main>
+<footer>Demo built with Claude by <a href="https://www.linkedin.com/in/chriscoyoli/">Chris Coyoli</a> · <a href="https://carmelvalleytechnologies.com">Carmel Valley Technologies</a>. All data is synthetic and generated in the page.</footer>
+<div id="tip" role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+"use strict";
+// ---------- synthetic data (seeded, deterministic) ----------
+function rng(seed){return function(){seed|=0;seed=seed+0x6D2B79F5|0;var t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+var R=rng(20260924);
+var SEGS=["Adult","Senior","Junior"];
+var P={Adult:{start:17800,join:.165,churn:.145},Senior:{start:7100,join:.105,churn:.09},Junior:{start:2650,join:.29,churn:.24}};
+var joinSeason=[.75,.9,1.35,1.55,1.4,1.15,1.0,.9,.8,.7,.6,.85];
+var lapseSeason=[3.6,1.2,.8,.6,.6,.6,.6,.6,.6,.7,.8,.9]; // sums ~ 12.1
+var MONTHS=[];var d0=new Date(2023,9,1);
+for(var i=0;i<36;i++){var dt=new Date(d0.getFullYear(),d0.getMonth()+i,1);MONTHS.push(dt);}
+var MN=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+function mlabel(d){return MN[d.getMonth()]+" "+String(d.getFullYear()).slice(2);}
+var flow={};SEGS.forEach(function(s){
+  var a=P[s].start;var rows=[];
+  for(var i=0;i<36;i++){
+    var m=MONTHS[i].getMonth();var trend=1+i*0.004;
+    var j=Math.round(a*P[s].join/12*joinSeason[m]*(0.9+R()*0.2)*trend);
+    var l=Math.round(a*P[s].churn/12*lapseSeason[m]/1.01*(0.9+R()*0.2)*(1-i*0.0025));
+    a=a+j-l;rows.push({j:j,l:l,a:a});
+  }
+  flow[s]=rows;
+});
+function segRows(seg){
+  if(seg!=="All")return flow[seg];
+  return MONTHS.map(function(_,i){var o={j:0,l:0,a:0};SEGS.forEach(function(s){o.j+=flow[s][i].j;o.l+=flow[s][i].l;o.a+=flow[s][i].a;});return o;});
+}
+// cohort curves: monthly decay + renewal cliffs at 12 and 24; newer cohorts retain better
+var COH=[{y:"2023",max:33,imp:0},{y:"2024",max:21,imp:.03},{y:"2025",max:9,imp:.055}];
+var cliff={Adult:[.74,.87],Senior:[.83,.92],Junior:[.61,.78]};
+function curve(seg,c){
+  var w=seg==="All"?{Adult:.64,Senior:.26,Junior:.10}:(function(){var o={Adult:0,Senior:0,Junior:0};o[seg]=1;return o;})();
+  var out=[];
+  for(var t=0;t<=c.max;t++){
+    var v=0;SEGS.forEach(function(s){
+      var r=1-t*(0.0035-c.imp*0.03);
+      if(t>=12)r*=Math.min(.99,cliff[s][0]+c.imp);
+      if(t>=24)r*=Math.min(.99,cliff[s][1]+c.imp*.5);
+      v+=w[s]*r;
+    });
+    out.push(+(v*100).toFixed(1));
+  }
+  return out;
+}
+var LTV={Adult:1240,Senior:1610,Junior:430};
+var RISK={Adult:{p:11.4},Senior:{p:6.8},Junior:{p:18.9}};
+var DRIVERS=[
+  {k:"No score posted in 90 days",seg:{Adult:3.1,Senior:2.6,Junior:3.4}},
+  {k:"Auto-renew turned off",seg:{Adult:2.8,Senior:2.4,Junior:2.2}},
+  {k:"First renewal due",seg:{Adult:2.2,Senior:1.8,Junior:2.6}},
+  {k:"No event entered this season",seg:{Adult:1.7,Senior:1.5,Junior:2.0}},
+  {k:"Detractor on last survey",seg:{Adult:1.6,Senior:1.9,Junior:1.3}}
+];
+var NPSQ=[];var npsBase=[34,36,33,38,39,37,41,42,40,44,45,47];var npsOff={Adult:0,Senior:6,Junior:-7};
+for(var q=0;q<12;q++){var qd=new Date(2023,9+q*3,1);NPSQ.push({l:"Q"+(Math.floor(qd.getMonth()/3)+1)+" "+String(qd.getFullYear()).slice(2),v:npsBase[q]});}
+
+// ---------- state ----------
+var S={range:12,seg:"All"};
+var fmt=function(n){return Math.round(n).toLocaleString("en-US");};
+var pct=function(n,d){return n.toFixed(d==null?1:d)+"%";};
+var usd=function(n){return "$"+fmt(n);};
+
+// ---------- helpers ----------
+var NS="http://www.w3.org/2000/svg";
+function el(tag,attrs,parent){var e=document.createElementNS(NS,tag);for(var k in attrs)e.setAttribute(k,attrs[k]);if(parent)parent.appendChild(e);return e;}
+function txt(parent,x,y,s,cls,anchor){var t=el("text",{x:x,y:y,"class":cls||"","text-anchor":anchor||"start"},parent);t.textContent=s;return t;}
+function nice(max){var p=Math.pow(10,Math.floor(Math.log10(max/4)));var n=[1,2,2.5,5,10].map(function(m){return m*p;}).find(function(v){return v>=max/4;});return n;}
+function roundTopBar(x,y,w,h,r,down){ // rounded at data end, square at baseline
+  r=Math.min(r,w/2,Math.abs(h));
+  if(!down)return "M"+x+","+(y+h)+"V"+(y+r)+"Q"+x+","+y+" "+(x+r)+","+y+"H"+(x+w-r)+"Q"+(x+w)+","+y+" "+(x+w)+","+(y+r)+"V"+(y+h)+"Z";
+  return "M"+x+","+y+"V"+(y+h-r)+"Q"+x+","+(y+h)+" "+(x+r)+","+(y+h)+"H"+(x+w-r)+"Q"+(x+w)+","+(y+h)+" "+(x+w)+","+(y+h-r)+"V"+y+"Z";
+}
+function roundRightBar(x,y,w,h,r){r=Math.min(r,h/2,w);return "M"+x+","+y+"H"+(x+w-r)+"Q"+(x+w)+","+y+" "+(x+w)+","+(y+r)+"V"+(y+h-r)+"Q"+(x+w)+","+(y+h)+" "+(x+w-r)+","+(y+h)+"H"+x+"Z";}
+var tip=document.getElementById("tip");
+function showTip(ev,title,rows){
+  tip.textContent="";var t=document.createElement("div");t.className="t";t.textContent=title;tip.appendChild(t);
+  rows.forEach(function(r){var d=document.createElement("div");d.className="r";var s=document.createElement("span");
+    if(r.c){var k=document.createElement("i");k.className="ln";k.style.background=r.c;s.appendChild(k);}
+    s.appendChild(document.createTextNode(r.k));var b=document.createElement("b");b.textContent=r.v;d.appendChild(s);d.appendChild(b);tip.appendChild(d);});
+  var x=ev.clientX,y=ev.clientY;
+  if(x==null){var bb=ev.target.getBoundingClientRect();x=bb.left+bb.width/2;y=bb.top;}
+  tip.style.opacity=1;var w=tip.offsetWidth,h=tip.offsetHeight;
+  var L=x+14;if(L+w>window.innerWidth-8)L=x-w-14;var T=y-h-10;if(T<8)T=y+16;
+  tip.style.left=L+"px";tip.style.top=T+"px";
+}
+function hideTip(){tip.style.opacity=0;}
+function bindMark(node,title,rows){
+  node.setAttribute("tabindex","0");node.setAttribute("class",(node.getAttribute("class")||"")+" mark");
+  node.setAttribute("aria-label",title+": "+rows.map(function(r){return r.k+" "+r.v;}).join(", "));
+  node.addEventListener("pointermove",function(e){showTip(e,title,rows);});
+  node.addEventListener("pointerleave",hideTip);
+  node.addEventListener("focus",function(e){showTip(e,title,rows);});
+  node.addEventListener("blur",hideTip);
+}
+function table(card,head,rows){
+  var box=card.querySelector(".viz");box.textContent="";var w=document.createElement("div");w.className="tvwrap";
+  var t=document.createElement("table");t.className="tv";var tr=document.createElement("tr");
+  head.forEach(function(h){var th=document.createElement("th");th.textContent=h;tr.appendChild(th);});t.appendChild(tr);
+  rows.forEach(function(r){var tr=document.createElement("tr");r.forEach(function(c){var td=document.createElement("td");td.textContent=c;tr.appendChild(td);});t.appendChild(tr);});
+  w.appendChild(t);box.appendChild(w);
+}
+function vw(id,def){var b=document.querySelector("#"+id+" .viz");var w=b&&b.clientWidth;return w>0?Math.round(w):def;}
+function svgFor(card,W,H){var box=card.querySelector(".viz");box.textContent="";return el("svg",{viewBox:"0 0 "+W+" "+H,role:"img"},box);}
+var tableMode={};
+
+// ---------- KPIs ----------
+function renderKPIs(){
+  var rows=segRows(S.seg),n=S.range,last=rows[35],cur=rows.slice(36-n),prevA=rows[35-12].a;
+  var joins=cur.reduce(function(s,r){return s+r.j;},0),laps=cur.reduce(function(s,r){return s+r.l;},0);
+  var yoy=(last.a-prevA)/prevA*100;
+  var ret=curve(S.seg,COH[1])[12];
+  var ltv=S.seg==="All"?(LTV.Adult*.64+LTV.Senior*.26+LTV.Junior*.10):LTV[S.seg];
+  var nps=NPSQ[11].v+(S.seg==="All"?0:npsOff[S.seg]),npsPrev=NPSQ[7].v+(S.seg==="All"?0:npsOff[S.seg]);
+  var K=[
+    ["Active members",fmt(last.a),(yoy>=0?"▲ ":"▼ ")+pct(Math.abs(yoy))+" vs. a year ago",yoy>=0],
+    ["Net adds, "+n+" mo",(joins-laps>=0?"+":"")+fmt(joins-laps),fmt(joins)+" joins, "+fmt(laps)+" lapses",null],
+    ["First-year retention",pct(ret),"2024 cohort at month 12",null],
+    ["Avg. lifetime value",usd(ltv),"Dues, events, course revenue",null],
+    ["Latest NPS",String(nps),(nps>=npsPrev?"▲ ":"▼ ")+Math.abs(nps-npsPrev)+" pts vs. a year ago",nps>=npsPrev]
+  ];
+  var box=document.getElementById("kpis");box.textContent="";
+  K.forEach(function(k){var d=document.createElement("div");d.className="kpi";
+    var a=document.createElement("p");a.className="k";a.textContent=k[0];
+    var b=document.createElement("p");b.className="v";b.textContent=k[1];
+    var c=document.createElement("p");c.className="d";
+    if(k[3]!==null){var s=document.createElement("b");s.className=k[3]?"up":"down";s.textContent=k[2];c.appendChild(s);}else c.textContent=k[2];
+    d.appendChild(a);d.appendChild(b);d.appendChild(c);box.appendChild(d);});
+  var jan=rows.slice(36-n).filter(function(_,i){return MONTHS[36-n+i].getMonth()===0;}).reduce(function(s,r){return s+r.l;},0);
+  document.getElementById("lede").textContent="Growth, retention, churn risk, lifetime value, and satisfaction for a fictional regional golf association. Over the last "+n+" months, "+(S.seg==="All"?"membership":S.seg.toLowerCase()+" membership")+" grew by "+fmt(joins-laps)+" net members, and January renewals alone accounted for "+Math.round(jan/laps*100)+"% of lapses.";
+}
+
+// ---------- Joins vs lapses (mirrored bars) ----------
+function renderFlow(){
+  var card=document.getElementById("c-flow"),rows=segRows(S.seg),n=S.range,sl=rows.slice(36-n),ms=MONTHS.slice(36-n);
+  if(tableMode["c-flow"])return table(card,["Month","Joins","Lapses","Net"],sl.map(function(r,i){return[mlabel(ms[i]),fmt(r.j),fmt(r.l),fmt(r.j-r.l)];}));
+  var W=vw("c-flow",640),H=260,m={l:44,r:8,t:10,b:24},iw=W-m.l-m.r,ih=H-m.t-m.b;
+  var mx=Math.max.apply(null,sl.map(function(r){return Math.max(r.j,r.l);}));var st=nice(mx),top=Math.ceil(mx/st)*st;
+  var svg=svgFor(card,W,H);var y=function(v){return m.t+ih/2-v/top*(ih/2);};
+  for(var v=-top;v<=top;v+=st){el("line",{x1:m.l,x2:W-m.r,y1:y(v),y2:y(v),"class":v===0?"base":"gridl"},svg);txt(svg,m.l-6,y(v)+4,fmt(Math.abs(v)),"","end");}
+  var bw=iw/n,gap=Math.max(2,bw*.22),w=bw-gap;
+  sl.forEach(function(r,i){
+    var x=m.l+i*bw+gap/2;
+    var g=el("g",{},svg);
+    el("rect",{x:m.l+i*bw,y:m.t,width:bw,height:ih,"class":"hit"},g);
+    el("path",{d:roundTopBar(x,y(r.j),w,y(0)-y(r.j)-1,Math.min(4,w/2)),fill:"var(--s1)"},g);
+    el("path",{d:roundTopBar(x,y(0)+1,w,y(-r.l)-y(0)-1,Math.min(4,w/2),true),fill:"var(--s2)"},g);
+    bindMark(g,mlabel(ms[i]),[{k:"Joins",v:fmt(r.j),c:"var(--s1)"},{k:"Lapses",v:fmt(r.l),c:"var(--s2)"},{k:"Net",v:(r.j-r.l>=0?"+":"")+fmt(r.j-r.l)}]);
+    var every=[1,2,3,6,12].find(function(e){return iw/n*e>=52;})||12;
+    if(i%every===0)txt(svg,x+w/2,H-6,mlabel(ms[i]),"","middle");
+  });
+  txt(svg,m.l+4,m.t+10,"Joins ↑","lbl");txt(svg,m.l+4,H-m.b-4,"Lapses ↓","lbl");
+}
+
+// ---------- Cohort retention curves ----------
+function renderCoh(){
+  var card=document.getElementById("c-coh");var cs=COH.map(function(c){return curve(S.seg,c);});
+  if(tableMode["c-coh"]){var rows=[];for(var t=0;t<=33;t+=3)rows.push(["Month "+t].concat(cs.map(function(c){return c[t]!=null?pct(c[t]):"not yet";})));return table(card,["Months since join","2023","2024","2025"],rows);}
+  var W=vw("c-coh",460),H=260,m={l:40,r:44,t:10,b:28},iw=W-m.l-m.r,ih=H-m.t-m.b,lo=40;
+  var svg=svgFor(card,W,H);var x=function(t){return m.l+t/33*iw;},y=function(v){return m.t+(100-v)/(100-lo)*ih;};
+  for(var v=lo;v<=100;v+=20){el("line",{x1:m.l,x2:W-m.r,y1:y(v),y2:y(v),"class":v===lo?"base":"gridl"},svg);txt(svg,m.l-6,y(v)+4,v+"%","","end");}
+  [0,6,12,18,24,30].forEach(function(t){txt(svg,x(t),H-10,String(t),"","middle");});
+  txt(svg,m.l+iw/2,H+4,"Months since joining","","middle");
+  var cols=["var(--c1)","var(--c2)","var(--c3)"];
+  cs.forEach(function(c,k){
+    var d=c.map(function(v,t){return(t?"L":"M")+x(t).toFixed(1)+","+y(v).toFixed(1);}).join("");
+    el("path",{d:d,fill:"none",stroke:cols[k],"stroke-width":2,"stroke-linejoin":"round","stroke-linecap":"round"},svg);
+    var e=c.length-1;el("circle",{cx:x(e),cy:y(c[e]),r:4,fill:cols[k],stroke:"var(--surface)","stroke-width":2},svg);
+    txt(svg,x(e)+8,y(c[e])+4,pct(c[e],0),"lblb");
+  });
+  var cross=el("line",{y1:m.t,y2:m.t+ih,stroke:"var(--axis)","stroke-width":1,opacity:0},svg);
+  var hit=el("rect",{x:m.l,y:m.t,width:iw,height:ih,"class":"hit",tabindex:"0","aria-label":"Cohort retention; use arrow keys"},svg);
+  var at=12;
+  function show(ev,t){cross.setAttribute("x1",x(t));cross.setAttribute("x2",x(t));cross.setAttribute("opacity",1);
+    showTip(ev,"Month "+t+" since joining",COH.map(function(c,k){return{k:c.y+" cohort",v:cs[k][t]!=null?pct(cs[k][t]):"not yet",c:cols[k]};}));}
+  hit.addEventListener("pointermove",function(e){var b=svg.getBoundingClientRect();var px=(e.clientX-b.left)/b.width*W;at=Math.max(0,Math.min(33,Math.round((px-m.l)/iw*33)));show(e,at);});
+  hit.addEventListener("pointerleave",function(){cross.setAttribute("opacity",0);hideTip();});
+  hit.addEventListener("keydown",function(e){if(e.key==="ArrowRight")at=Math.min(33,at+1);else if(e.key==="ArrowLeft")at=Math.max(0,at-1);else return;e.preventDefault();show({target:hit},at);});
+  hit.addEventListener("focus",function(){show({target:hit},at);});hit.addEventListener("blur",function(){cross.setAttribute("opacity",0);hideTip();});
+}
+
+// ---------- horizontal bars (single series, emphasis on selected segment) ----------
+function hbars(id,data,valFmt,W,rowH,labelW,maxV){
+  var card=document.getElementById(id);
+  var H=data.length*rowH+8,svg=svgFor(card,W,H),iw=W-labelW-54;
+  var mx=maxV||Math.max.apply(null,data.map(function(d){return d.v;}));
+  data.forEach(function(d,i){
+    var yy=4+i*rowH,bh=Math.min(20,rowH-12),by=yy+(rowH-bh)/2,w=Math.max(2,d.v/mx*iw);
+    var g=el("g",{},svg);
+    el("rect",{x:0,y:yy,width:W,height:rowH,"class":"hit"},g);
+    txt(g,0,by+bh/2+4,d.k,d.dim?"":"lbl");
+    el("path",{d:roundRightBar(labelW,by,w,bh,4),fill:d.dim?"var(--lo)":"var(--hi)"},g);
+    txt(g,labelW+w+6,by+bh/2+4,valFmt(d.v),d.dim?"":"lblb");
+    bindMark(g,d.k,[{k:d.tk||"Value",v:valFmt(d.v)}].concat(d.extra||[]));
+  });
+  el("line",{x1:labelW,x2:labelW,y1:0,y2:H,"class":"base"},svg);
+}
+function renderRisk(){
+  var totals={};SEGS.forEach(function(s){totals[s]=flow[s][35].a;});
+  var data=SEGS.map(function(s){return{k:s,v:RISK[s].p,tk:"High-risk share",dim:S.seg!=="All"&&S.seg!==s,extra:[{k:"Members at risk",v:fmt(totals[s]*RISK[s].p/100)}]};});
+  if(tableMode["c-risk"])return table(document.getElementById("c-risk"),["Segment","High-risk share","Members at risk"],data.map(function(d){return[d.k,pct(d.v),fmt(totals[d.k]*d.v/100)];}));
+  hbars("c-risk",data,function(v){return pct(v);},340,46,62,25);
+  var at=SEGS.reduce(function(s,k){return s+totals[k]*RISK[k].p/100;},0);
+  var n=document.createElement("p");n.className="note";n.textContent=fmt(at)+" members flagged across all segments: the renewal outreach list.";document.querySelector("#c-risk .viz").appendChild(n);
+}
+function renderDrv(){
+  var seg=S.seg==="All"?null:S.seg;
+  var data=DRIVERS.map(function(d){var v=seg?d.seg[seg]:(d.seg.Adult*.64+d.seg.Senior*.26+d.seg.Junior*.10);return{k:d.k,v:v,tk:"Lapse rate vs. baseline"};});
+  if(tableMode["c-drv"])return table(document.getElementById("c-drv"),["Signal","Lapse rate vs. baseline"],data.map(function(d){return[d.k,d.v.toFixed(1)+"×"];}));
+  var card=document.getElementById("c-drv");var box=card.querySelector(".viz");box.textContent="";
+  var W=340,rowH=40,H=data.length*rowH+4,svg=el("svg",{viewBox:"0 0 "+W+" "+H,role:"img"},box),iw=W-40,mx=3.6;
+  data.forEach(function(d,i){
+    var yy=i*rowH,g=el("g",{},svg);el("rect",{x:0,y:yy,width:W,height:rowH,"class":"hit"},g);
+    txt(g,0,yy+13,d.k,"lbl");var w=d.v/mx*iw;
+    el("path",{d:roundRightBar(0,yy+19,w,14,4),fill:"var(--hi)"},g);
+    txt(g,w+6,yy+30,d.v.toFixed(1)+"×","lblb");
+    bindMark(g,d.k,[{k:"Lapse rate vs. baseline",v:d.v.toFixed(1)+"×"}]);
+  });
+}
+function renderLTV(){
+  var data=SEGS.map(function(s){return{k:s,v:LTV[s],tk:"Lifetime value",dim:S.seg!=="All"&&S.seg!==s};});
+  if(tableMode["c-ltv"])return table(document.getElementById("c-ltv"),["Segment","Lifetime value"],data.map(function(d){return[d.k,usd(d.v)];}));
+  hbars("c-ltv",data,usd,340,46,62,1900);
+  var n=document.createElement("p");n.className="note";n.textContent="Seniors are worth the most over time: highest retention and most event entries.";document.querySelector("#c-ltv .viz").appendChild(n);
+}
+function renderNPS(){
+  var card=document.getElementById("c-nps"),off=S.seg==="All"?0:npsOff[S.seg],nq=Math.round(S.range/3),q=NPSQ.slice(12-nq).map(function(d){return{l:d.l,v:d.v+off};});
+  if(tableMode["c-nps"])return table(card,["Quarter","NPS"],q.map(function(d){return[d.l,String(d.v)];}));
+  var W=vw("c-nps",1100),H=190,m={l:36,r:40,t:14,b:24},iw=W-m.l-m.r,ih=H-m.t-m.b,lo=20,hi=60;
+  var svg=svgFor(card,W,H);var x=function(i){return m.l+(q.length===1?iw/2:i/(q.length-1)*iw);},y=function(v){return m.t+(hi-v)/(hi-lo)*ih;};
+  for(var v=lo;v<=hi;v+=10){el("line",{x1:m.l,x2:W-m.r,y1:y(v),y2:y(v),"class":v===lo?"base":"gridl"},svg);txt(svg,m.l-6,y(v)+4,String(v),"","end");}
+  var qe=Math.max(1,Math.ceil(q.length*48/iw));q.forEach(function(d,i){if(i%qe===0||i===q.length-1)txt(svg,x(i),H-6,d.l,"","middle");});
+  el("path",{d:q.map(function(d,i){return(i?"L":"M")+x(i)+","+y(d.v);}).join(""),fill:"none",stroke:"var(--hi)","stroke-width":2,"stroke-linejoin":"round"},svg);
+  q.forEach(function(d,i){var c=el("circle",{cx:x(i),cy:y(d.v),r:4.5,fill:"var(--hi)",stroke:"var(--surface)","stroke-width":2},svg);});
+  var L=q.length-1;txt(svg,x(L)+10,y(q[L].v)+4,String(q[L].v),"lblb");
+  var cross=el("line",{y1:m.t,y2:m.t+ih,stroke:"var(--axis)",opacity:0},svg);
+  var hit=el("rect",{x:m.l-10,y:m.t,width:iw+20,height:ih,"class":"hit",tabindex:"0","aria-label":"NPS by quarter; use arrow keys"},svg);var at=L;
+  function show(ev,i){cross.setAttribute("x1",x(i));cross.setAttribute("x2",x(i));cross.setAttribute("opacity",1);showTip(ev,q[i].l,[{k:"NPS",v:String(q[i].v),c:"var(--hi)"}]);}
+  hit.addEventListener("pointermove",function(e){var b=svg.getBoundingClientRect();var px=(e.clientX-b.left)/b.width*W;at=Math.max(0,Math.min(L,Math.round((px-m.l)/iw*L)));show(e,at);});
+  hit.addEventListener("pointerleave",function(){cross.setAttribute("opacity",0);hideTip();});
+  hit.addEventListener("keydown",function(e){if(e.key==="ArrowRight")at=Math.min(L,at+1);else if(e.key==="ArrowLeft")at=Math.max(0,at-1);else return;e.preventDefault();show({target:hit},at);});
+  hit.addEventListener("focus",function(){show({target:hit},at);});hit.addEventListener("blur",function(){cross.setAttribute("opacity",0);hideTip();});
+}
+function renderAll(){hideTip();renderKPIs();renderFlow();renderCoh();renderRisk();renderDrv();renderLTV();renderNPS();}
+
+// ---------- controls ----------
+function group(id,fn){var g=document.getElementById(id);g.addEventListener("click",function(e){var b=e.target.closest("button");if(!b)return;
+  g.querySelectorAll("button").forEach(function(x){x.setAttribute("aria-pressed",x===b?"true":"false");});fn(b.getAttribute("data-v"));});}
+group("f-range",function(v){S.range=+v;renderAll();});
+group("f-seg",function(v){S.seg=v;renderAll();});
+group("f-theme",function(v){if(v==="auto")document.documentElement.removeAttribute("data-theme");else document.documentElement.setAttribute("data-theme",v);});
+document.querySelectorAll(".card .tbtn").forEach(function(b){b.addEventListener("click",function(){var id=b.closest(".card").id;tableMode[id]=!tableMode[id];b.textContent=tableMode[id]?"Chart":"Table";renderAll();});});
+window.addEventListener("scroll",hideTip,{passive:true});
+var rz;window.addEventListener("resize",function(){clearTimeout(rz);rz=setTimeout(renderAll,150);});
+renderAll();
+})();
+</script>
+</body>
+</html>
